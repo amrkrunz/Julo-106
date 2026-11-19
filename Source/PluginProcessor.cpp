@@ -40,6 +40,7 @@ J106Processor::J106Processor()
 {
     for (int i = 0; i < P::COUNT; ++i)
         raw[i] = apvts.getRawParameterValue(paramDefs()[i].id);
+    engine.prepare(44100.0);   // safe defaults in case a host calls processBlock before prepareToPlay
 }
 
 bool J106Processor::isBusesLayoutSupported(const BusesLayout& l) const
@@ -114,6 +115,7 @@ void J106Processor::setCurrentProgram(int index)
 {
     const auto& list = presets();
     if (index < 0 || index >= (int) list.size()) return;
+    if (index == currentProgram) return;   // hosts re-send the current program on load; don't overwrite saved/tweaked settings
     currentProgram = index;
 
     const ParamDef* d = paramDefs();

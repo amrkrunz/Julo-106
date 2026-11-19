@@ -15,8 +15,6 @@ J106Editor::J106Editor(J106Processor& p)
     : AudioProcessorEditor(&p), proc(p),
       keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
-    setSize(1180, 700);
-
     // ---- panel sliders (same order and grouping as the hardware panel)
     const struct { const char* title; juce::Colour col; std::vector<int> ids; } panel[] = {
         { "LFO",  kOrange, { P::lfoRate, P::lfoDelay } },
@@ -72,6 +70,7 @@ J106Editor::J106Editor(J106Processor& p)
 
     syncPresetBox();
     startTimerHz(8);
+    setSize(1180, 700);   // must come last: it triggers resized(), which needs every control to exist
 }
 
 J106Editor::~J106Editor() { stopTimer(); }
@@ -160,6 +159,7 @@ void J106Editor::layoutGroup(Group& g, juce::Rectangle<int> area)
 
 void J106Editor::resized()
 {
+    if (groups.size() < 14) return;
     auto r = getLocalBounds().reduced(10);
     auto top = r.removeFromTop(34);
     top.removeFromLeft(220);
