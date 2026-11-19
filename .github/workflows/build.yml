@@ -1,0 +1,65 @@
+name: Build J-106
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  dsp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run DSP tests
+        run: |
+          g++ -std=c++17 -O2 -o dsp_test tests/dsp_test.cpp && ./dsp_test
+          g++ -std=c++17 -O2 -o preset_test tests/preset_test.cpp && ./preset_test
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Stage VST3
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem -Path build -Recurse -Directory -Filter "J-106.vst3" | Select-Object -First 1
+          if (-not $bundle) { throw "J-106.vst3 not found" }
+          New-Item -ItemType Directory -Force -Path stage, dist | Out-Null
+          Copy-Item -Recurse -Force $bundle.FullName stage\J-106.vst3
+          Compress-Archive -Path stage\J-106.vst3 -DestinationPath dist\J-106-Windows-vst3.zip
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\windows.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: J-106-Windows
+          path: dist/*
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - name: Package
+        run: |
+          VST3=$(find build -name "J-106.vst3" -type d | head -n1)
+          test -n "$VST3"
+          mkdir -p pkgroot dist
+          cp -R "$VST3" pkgroot/J-106.vst3
+          codesign --force --deep --sign - pkgroot/J-106.vst3
+          pkgbuild --root pkgroot --identifier com.j106project.j106.vst3 --version 1.0.0 \
+                   --install-location "/Library/Audio/Plug-Ins/VST3" dist/J-106-macOS.pkg
+          (cd pkgroot && zip -r -y ../dist/J-106-macOS-vst3.zip J-106.vst3)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: J-106-macOS
+          path: dist/*
